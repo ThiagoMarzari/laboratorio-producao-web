@@ -1,0 +1,8 @@
+# Credenciais (use o .env.example como modelo)
+.env
+
+# Sistema / editor
+.DS_Store
+
+# Cache de build do TypeScript
+*.tsbuildinfo
