@@ -7,5 +7,11 @@
     {
       "path": "./tsconfig.app.json"
     }
-  ]
+  ],
+  // Lido pelo CLI do shadcn-vue para resolver o alias `@`.
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  }
 }

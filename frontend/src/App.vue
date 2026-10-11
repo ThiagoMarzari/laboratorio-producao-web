@@ -1,47 +1,44 @@
 <script setup lang="ts">
-import { RouterLink, RouterView } from "vue-router";
+import { RouterLink, RouterView } from 'vue-router'
+import ModeToggle from '@/components/ModeToggle.vue'
+import { Button } from '@/components/ui/button'
+
+const links = [
+  { to: '/', rotulo: 'Início' },
+  { to: '/deploy', rotulo: 'Deploy' },
+]
 </script>
 
 <template>
-  <header class="topbar">
-    <span class="brand">Laboratório de Produção</span>
+  <header class="border-b">
+    <div class="mx-auto flex h-14 max-w-5xl items-center gap-4 px-4">
+      <span class="truncate font-semibold">Laboratório de Produção</span>
 
-    <nav>
-      <RouterLink to="/">Início</RouterLink>
-      <RouterLink to="/deploy">Deploy</RouterLink>
-    </nav>
+      <nav class="ml-auto flex shrink-0 items-center gap-1">
+        <RouterLink
+          v-for="link in links"
+          :key="link.to"
+          v-slot="{ href, navigate, isExactActive }"
+          :to="link.to"
+          custom
+        >
+          <Button
+            as="a"
+            :href="href"
+            :variant="isExactActive ? 'secondary' : 'ghost'"
+            :aria-current="isExactActive ? 'page' : undefined"
+            @click="navigate"
+          >
+            {{ link.rotulo }}
+          </Button>
+        </RouterLink>
+      </nav>
+
+      <ModeToggle class="shrink-0" />
+    </div>
   </header>
 
-  <RouterView />
+  <main class="mx-auto max-w-5xl px-4 py-8">
+    <RouterView />
+  </main>
 </template>
-
-<style scoped>
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1.25rem 0;
-  border-bottom: 1px solid var(--color-border);
-  margin-bottom: 2rem;
-}
-
-.brand {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--color-heading);
-}
-
-nav a {
-  display: inline-block;
-  padding: 0.25rem 1rem;
-  border-left: 1px solid var(--color-border);
-}
-
-nav a:first-of-type {
-  border: 0;
-}
-
-nav a.router-link-exact-active {
-  color: var(--color-text);
-}
-</style>

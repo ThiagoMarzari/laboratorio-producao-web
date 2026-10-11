@@ -5,6 +5,14 @@
     <link rel="icon" href="/favicon.ico">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Laboratório de Produção</title>
+    <script>
+      // Aplica o tema salvo pelo useColorMode antes do Vue montar (evita o flash do tema claro).
+      try {
+        const modo = localStorage.getItem('vueuse-color-scheme') || 'auto'
+        const escuro = modo === 'dark' || (modo === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.classList.toggle('dark', escuro)
+      } catch {}
+    </script>
   </head>
   <body>
     <div id="app"></div>
