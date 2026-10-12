@@ -3,9 +3,9 @@ import HealthStatus from '@/components/HealthStatus.vue'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 const topicos = [
-  { titulo: 'Docker', descricao: 'Imagens, camadas e build multi-stage (Dockerfile e Dockerfile.dev).' },
+  { titulo: 'Docker', descricao: 'Imagens, camadas e build multi-stage do frontend e do backend.' },
   { titulo: 'nginx', descricao: 'Servir o build estático, fallback de SPA e cache de assets.' },
-  { titulo: 'docker compose', descricao: 'Orquestrar frontend e, no futuro, o backend.' },
+  { titulo: 'docker compose', descricao: 'Orquestrar frontend, backend e Postgres numa rede interna.' },
   { titulo: 'Ambientes', descricao: 'Diferenças entre desenvolvimento e produção.' },
 ]
 

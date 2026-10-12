@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Monorepo-style layout (git repo, branch `main`; root `.gitignore` excludes `.env` — `.env.example` is the template) with two top-level dirs:
 
-- `backend/` — freshly scaffolded NestJS 12 app (`nest new`, strict mode). Only the default `AppModule`/`AppController`/`AppService` (GET `/` → "Hello World!").
+- `backend/` — NestJS 12 app (strict mode). Default `AppController` (GET `/` → "Hello World!") plus `HealthModule` (GET `/health` → `{ status, uptime, timestamp }`). Not connected to Postgres yet.
 - `frontend/` — Vue 3 + TypeScript + Vite app styled with Tailwind CSS v4 + shadcn-vue. Routes: `/` (`HomeView`, with `HealthStatus` polling `/api/health`) and `/deploy` (`DeployView`).
 
 ## Frontend commands (run from `frontend/`)
@@ -25,15 +25,15 @@ No test runner or linter is configured yet.
 
 ## Backend commands (run from `backend/`)
 
-pnpm; ESM project (`"type": "module"`, relative imports need `.js` suffix).
+npm (lockfile is `package-lock.json`, same as the frontend); ESM project (`"type": "module"`, relative imports need `.js` suffix).
 
 ```sh
-pnpm install
-pnpm start:dev      # nest start --watch, port 3000 (or $PORT)
-pnpm build          # nest build -> dist/
-pnpm start:prod     # node dist/main
-pnpm test           # vitest; pnpm test:e2e for test/*.e2e-spec.ts
-pnpm lint           # oxlint
+npm install
+npm run start:dev   # nest start --watch, port 3000 (or $PORT)
+npm run build       # nest build -> dist/
+npm run start:prod  # node dist/main.js
+npm test            # vitest; npm run test:e2e for test/*.e2e-spec.ts
+npm run lint        # oxlint
 ```
 
 ## Architecture notes
@@ -44,4 +44,4 @@ pnpm lint           # oxlint
 - `shadcn-vue` (the CLI) is a devDependency only because `main.css` imports `shadcn-vue/tailwind.css`; its `npm audit` findings are CLI-only and never reach the bundle.
 - Router uses `createWebHistory(import.meta.env.BASE_URL)`; non-home routes are lazy-loaded.
 - TypeScript is split via project references: `tsconfig.app.json` (src) and `tsconfig.node.json` (Vite config), so `vue-tsc --build` checks both.
-- Docker: `frontend/Dockerfile` is a multi-stage production build (`npm ci` + `npm run build`, then nginx serving `dist/` with `nginx.conf`, which also proxies `/api` to the backend); it's what `docker-compose.yml` builds (port 80).
+- Docker: `frontend/Dockerfile` is a multi-stage production build (`npm ci` + `npm run build`, then nginx serving `dist/` with `nginx.conf`, which also proxies `/api` to the backend); it's what `docker-compose.yml` builds (port 80). `backend/Dockerfile` is also multi-stage (`npm ci` + `npm run build` + `npm prune --omit=dev`, then `node dist/main.js` as user `node`); the backend has no published port — only nginx reaches it on the compose network. All services use `restart: unless-stopped`; the backend has `init: true` for signal forwarding.

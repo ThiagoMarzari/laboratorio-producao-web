@@ -25,7 +25,7 @@ containers, servidor web, reverse proxy, banco de dados e deploy.
   - [O caminho de uma requisição](#o-caminho-de-uma-requisição)
   - [Rede interna do Docker](#rede-interna-do-docker)
   - [Ordem de inicialização](#ordem-de-inicialização)
-  - [Build da imagem do frontend](#build-da-imagem-do-frontend)
+  - [Build das imagens](#build-das-imagens)
 - [Stack](#-stack)
 - [Estrutura de pastas](#-estrutura-de-pastas)
 - [Como rodar na sua máquina](#-como-rodar-na-sua-máquina)
@@ -45,7 +45,7 @@ O projeto é um monorepo com duas aplicações e um banco, orquestrados pelo **D
 
 | Serviço | O que é | Porta no container | Acessível do seu computador? |
 |---|---|---|---|
-| **frontend** | nginx servindo o build do Vue + reverse proxy para a API | `80` | ✅ sim, em **http://localhost:5173** |
+| **frontend** | nginx servindo o build do Vue + reverse proxy para a API | `80` | ✅ sim, em **http://localhost** (porta 80) |
 | **backend** | API em NestJS | `3000` | ❌ não, só pela rede interna (via nginx) |
 | **postgres** | Banco PostgreSQL 18 | `5432` | ❌ não, só pela rede interna |
 
@@ -62,7 +62,7 @@ flowchart LR
     user(["👤 Navegador"])
 
     subgraph host["💻 Seu computador"]
-        port["localhost:5173"]
+        port["localhost:80"]
 
         subgraph net["🔒 Rede interna do Docker (laboratorio-producao-web_default)"]
             subgraph fe["📦 frontend (nginx:alpine)"]
@@ -82,8 +82,8 @@ flowchart LR
         vol[/"💾 volume pgdata"/]
     end
 
-    user -->|"http://localhost:5173"| port
-    port -->|"mapeamento 5173 → 80"| nginx
+    user -->|"http://localhost"| port
+    port -->|"mapeamento 80 → 80"| nginx
     nginx -->|"/  → arquivos estáticos"| static
     nginx -->|"/api/*  → proxy_pass"| nest
     nest -.->|"em breve: DATABASE_URL"| pg
@@ -109,7 +109,7 @@ sequenceDiagram
     participant N as nginx (frontend:80)
     participant A as NestJS (backend:3000)
 
-    B->>N: GET http://localhost:5173/
+    B->>N: GET http://localhost/
     N-->>B: index.html + JS/CSS (da pasta dist/)
 
     Note over B: O Vue carrega e o HealthStatus<br/>chama fetch('/api/health')
@@ -150,7 +150,7 @@ flowchart TB
         postgres["postgres<br/>172.x.x.c"]
     end
 
-    browser -->|"localhost:5173 (ports)"| frontend
+    browser -->|"localhost:80 (ports)"| frontend
     frontend -->|"1. qual o IP de 'backend'?"| dns
     dns -->|"2. 172.x.x.b"| frontend
     frontend -->|"3. conecta em :3000"| backend
@@ -178,35 +178,36 @@ flowchart LR
 - O **postgres** tem um **healthcheck**: a cada 5s o Docker roda `pg_isready` e marca o container como `healthy` quando o banco aceita conexões.
 - Quando o backend passar a usar o banco, ele vai ganhar `depends_on: postgres: condition: service_healthy`, para só subir com o banco pronto.
 
-### Build da imagem do frontend
+### Build das imagens
 
-O [frontend/Dockerfile](frontend/Dockerfile) usa **multi-stage build**: um estágio pesado compila, e a imagem final leva só o resultado.
+Os dois Dockerfiles usam **multi-stage build**: um estágio pesado compila, e a imagem final leva só o resultado. Cada linha dos Dockerfiles está comentada.
 
 ```mermaid
 flowchart LR
-    subgraph s1["Estágio 1: builder (node:24-alpine)"]
+    subgraph s1["Estágio 1: build (node:24-alpine)"]
         direction TB
-        a["COPY código"] --> b["npm ci"]
-        b --> c["npm run build<br/>(type-check + vite build)"]
-        c --> d[("/app/dist")]
+        a["COPY package.json + package-lock.json"] --> b["npm ci<br/>(cacheado se as deps não mudaram)"]
+        b --> c["COPY código"]
+        c --> d["npm run build"]
     end
 
-    subgraph s2["Estágio 2: imagem final (nginx:alpine)"]
+    subgraph s2["Estágio 2: imagem final"]
         direction TB
-        e["COPY --from=builder /app/dist"] --> f["COPY nginx.conf"]
-        f --> g["nginx -g 'daemon off;'"]
+        e["COPY --from=build<br/>só o resultado"] --> f["CMD"]
     end
 
-    d -->|"só a dist/ atravessa"| e
-    trash["🗑️ node_modules, código-fonte, Node<br/>ficam para trás"]
+    d -->|"só o build atravessa"| e
+    trash["🗑️ código-fonte, ferramentas de dev<br/>ficam para trás"]
     s1 -.-> trash
 ```
 
-| | Estágio `builder` | Imagem final |
+| | [frontend/Dockerfile](frontend/Dockerfile) | [backend/Dockerfile](backend/Dockerfile) |
 |---|---|---|
-| Base | `node:24-alpine` | `nginx:alpine` |
-| Contém | Node, `node_modules`, código-fonte | só nginx + `dist/` + `nginx.conf` |
-| Vai para produção? | ❌ descartado | ✅ |
+| Estágio `build` | `npm ci` + `npm run build` (type-check + vite build) | `npm ci` + `npm run build` + `npm prune --omit=dev` |
+| Base da imagem final | `nginx:alpine` (sem Node) | `node:24-alpine` |
+| O que vai para a imagem final | `dist/` + `nginx.conf` | `dist/` + `node_modules` de produção + `package.json` |
+| Roda como | nginx | usuário `node` (não root), `NODE_ENV=production` |
+| Comando | `nginx -g 'daemon off;'` | `node dist/main.js` |
 
 ---
 
@@ -216,6 +217,7 @@ flowchart LR
 |---|---|---|
 | Frontend | Vue 3 + TypeScript + Vue Router | Vue `^3.5`, Router `^5.3` |
 | Build do frontend | Vite | `^8.2` |
+| UI do frontend | Tailwind CSS + shadcn-vue (Reka UI, ícones lucide) | Tailwind `^4.3`, shadcn-vue `^2.8` |
 | Backend | NestJS (ESM, strict) | `^12.0` |
 | Testes do backend | Vitest + Supertest | `^4.1` |
 | Lint do backend | oxlint | `^1.58` |
@@ -224,7 +226,7 @@ flowchart LR
 | Runtime | Node.js | `24` (`^22.18.0 \|\| >=24.12.0`) |
 | Orquestração | Docker Compose | — |
 
-**Gerenciadores de pacote:** o **frontend usa npm** (`package-lock.json`) e o **backend usa pnpm** (`pnpm-lock.yaml`).
+**Gerenciador de pacotes:** **npm** no frontend e no backend (`package-lock.json` em cada um).
 
 ---
 
@@ -239,8 +241,8 @@ laboratorio-producao-web/
 ├── README.md
 │
 ├── backend/                  # API NestJS
-│   ├── Dockerfile            # imagem do backend (hoje roda em modo dev)
-│   ├── package.json          # pnpm
+│   ├── Dockerfile            # multi-stage: build + node dist/main.js como usuário node
+│   ├── package.json          # npm
 │   ├── src/
 │   │   ├── main.ts           # bootstrap: sobe o Nest na porta $PORT ou 3000
 │   │   ├── app.module.ts     # módulo raiz
@@ -253,16 +255,22 @@ laboratorio-producao-web/
 └── frontend/                 # SPA Vue 3
     ├── Dockerfile            # multi-stage: build com Node → serve com nginx
     ├── nginx.conf            # arquivos estáticos + fallback SPA + proxy /api
-    ├── vite.config.ts        # alias @ e proxy /api para o `npm run dev`
+    ├── vite.config.ts        # alias @, Tailwind e proxy /api para o `npm run dev`
+    ├── components.json       # configuração do shadcn-vue (usada pelo CLI)
+    ├── index.html            # aplica o tema salvo antes do Vue carregar (sem flash)
     ├── package.json          # npm
     └── src/
-        ├── App.vue           # layout com a barra de navegação
+        ├── App.vue           # layout: barra de navegação + seletor de tema
+        ├── assets/main.css   # Tailwind + variáveis de tema (claro/escuro)
+        ├── lib/utils.ts      # cn(): junta classes do Tailwind
         ├── router/index.ts   # rotas: / e /deploy
         ├── views/
         │   ├── HomeView.vue  # página inicial (tópicos de estudo + status do backend)
         │   └── DeployView.vue
         └── components/
-            └── HealthStatus.vue   # chama /api/health e mostra online/offline
+            ├── HealthStatus.vue   # chama /api/health e mostra online/offline
+            ├── ModeToggle.vue     # claro / escuro / sistema
+            └── ui/                # componentes do shadcn-vue (gerados pelo CLI)
 ```
 
 ---
@@ -272,7 +280,7 @@ laboratorio-producao-web/
 ### Pré-requisitos
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (ou Docker Engine + plugin Compose)
-- Para rodar **sem Docker**: Node.js `24` (ou `^22.18.0`), npm e pnpm (`corepack enable`)
+- Para rodar **sem Docker**: Node.js `24` (ou `^22.18.0`) e npm
 
 ### Opção 1 · Com Docker (recomendado)
 
@@ -301,8 +309,8 @@ docker compose up --build
 
 | O quê | URL |
 |---|---|
-| 🌐 Aplicação | http://localhost:5173 |
-| ❤️ Health check da API (via nginx) | http://localhost:5173/api/health |
+| 🌐 Aplicação | http://localhost |
+| ❤️ Health check da API (via nginx) | http://localhost/api/health |
 
 Se o card na página inicial mostrar **"Backend online"** em verde, o caminho inteiro (navegador → nginx → NestJS) está funcionando.
 
@@ -317,7 +325,7 @@ Saída esperada (resumida):
 ```text
 SERVICE    STATUS                    PORTS
 backend    Up                        3000/tcp
-frontend   Up                        0.0.0.0:5173->80/tcp
+frontend   Up                        0.0.0.0:80->80/tcp
 postgres   Up (healthy)              5432/tcp
 ```
 
@@ -337,8 +345,8 @@ O proxy configurado no [vite.config.ts](frontend/vite.config.ts) faz o mesmo pap
 
 ```sh
 cd backend
-pnpm install
-pnpm start:dev        # http://localhost:3000, reinicia a cada alteração
+npm install
+npm run start:dev     # http://localhost:3000, reinicia a cada alteração
 ```
 
 **Terminal 2: frontend**
@@ -351,7 +359,7 @@ npm run dev           # http://localhost:5173, hot reload
 
 > ℹ️ Nesse modo o banco não fica acessível do seu computador, porque o serviço `postgres` não tem `ports`. Quando o backend passar a usar o banco, adicione `ports: ["5432:5432"]` ao `postgres` no compose (ou `"5433:5432"` se já tiver um Postgres instalado localmente).
 
-> ⚠️ Não rode os dois modos ao mesmo tempo: os dois usam a porta **5173**.
+> ℹ️ Os dois modos podem rodar juntos: o Docker usa a porta **80** e o Vite a **5173** (o backend do Docker não publica a 3000).
 
 ---
 
@@ -384,7 +392,8 @@ Lidas do arquivo `.env` na raiz pelo Docker Compose (`${NOME}` no `docker-compos
 | `POSTGRES_USER` | postgres | Usuário criado na primeira inicialização do banco |
 | `POSTGRES_PASSWORD` | postgres | Senha desse usuário |
 | `POSTGRES_DB` | postgres | Banco criado na primeira inicialização |
-| `PORT` | backend | Porta do NestJS (padrão `3000`) |
+
+> ℹ️ O backend também lê `PORT` (padrão `3000`), mas o compose não repassa essa variável: no Docker ele sempre usa a 3000.
 
 > 📌 As variáveis `POSTGRES_*` **só têm efeito na primeira vez** que o volume `pgdata` é criado. Se você mudar a senha depois, precisa recriar o volume (veja `docker compose down -v` abaixo, que **apaga os dados**).
 
@@ -430,26 +439,26 @@ docker compose up
 
 | Frontend (`cd frontend`) | Backend (`cd backend`) |
 |---|---|
-| `npm run dev`: Vite com hot reload | `pnpm start:dev`: Nest em modo watch |
-| `npm run build`: type-check + build de produção | `pnpm build`: compila para `dist/` |
-| `npm run type-check`: só checa os tipos | `pnpm test` / `pnpm test:e2e`: testes |
-| `npm run preview`: serve a `dist/` localmente | `pnpm lint`: oxlint |
+| `npm run dev`: Vite com hot reload | `npm run start:dev`: Nest em modo watch |
+| `npm run build`: type-check + build de produção | `npm run build`: compila para `dist/` |
+| `npm run type-check`: só checa os tipos | `npm test` / `npm run test:e2e`: testes |
+| `npm run preview`: serve a `dist/` localmente | `npm run lint`: oxlint |
 
 ---
 
 ## 🩺 Solução de problemas
 
 <details>
-<summary><b>O navegador não abre <code>localhost:5173</code> ("Empty reply" ou "connection refused")</b></summary>
+<summary><b>O navegador não abre <code>localhost</code> ("Empty reply" ou "connection refused")</b></summary>
 
 O mapeamento de porta precisa apontar para a porta em que **o nginx escuta (80)**, não para a do Vite:
 
 ```yaml
 ports:
-  - "5173:80"   # seu computador:5173 → container:80
+  - "80:80"   # seu computador:80 → container:80
 ```
 
-Confira com `docker compose ps`: deve aparecer `0.0.0.0:5173->80/tcp`.
+Confira com `docker compose ps`: deve aparecer `0.0.0.0:80->80/tcp`. Se outro programa já usa a porta 80 no seu computador, troque o lado esquerdo (ex.: `"8080:80"`) e acesse `localhost:8080`.
 </details>
 
 <details>
@@ -478,7 +487,7 @@ O nginx não conseguiu falar com o backend. Verifique:
 <details>
 <summary><b>O card mostra "Backend offline"</b></summary>
 
-1. Abra http://localhost:5173/api/health direto no navegador. Se responder `{"status":"ok"}`, o problema está no frontend.
+1. Abra http://localhost/api/health direto no navegador. Se responder `{"status":"ok"}`, o problema está no frontend.
 2. O frontend precisa chamar `/api/...`, nunca `http://localhost:3000`. O navegador roda fora do Docker e não alcança o backend diretamente.
 3. A imagem pode estar desatualizada: `docker compose up -d --build frontend`.
 </details>
@@ -536,21 +545,24 @@ docker compose up -d postgres
 flowchart LR
     A["✅ Frontend em produção<br/>(multi-stage + nginx)"] --> B["✅ Reverse proxy /api<br/>(sem CORS)"]
     B --> C["✅ Postgres no compose<br/>(volume + healthcheck)"]
-    C --> D["⏳ Backend conectado ao banco<br/>(escolher ORM)"]
-    D --> E["⏳ Backend em modo produção<br/>(node dist/main)"]
-    E --> F["🔮 Redis, filas, SSE,<br/>cluster do Node"]
+    C --> E["✅ Backend em modo produção<br/>(node dist/main.js)"]
+    E --> D["⏳ Backend conectado ao banco<br/>(escolher ORM)"]
+    D --> F["🔮 Redis, filas, SSE,<br/>cluster do Node"]
 
     style A fill:#e8f7ee,stroke:#2e9e5b,color:#1a1a1a
     style B fill:#e8f7ee,stroke:#2e9e5b,color:#1a1a1a
     style C fill:#e8f7ee,stroke:#2e9e5b,color:#1a1a1a
     style D fill:#fff7e6,stroke:#d4a017,color:#1a1a1a
-    style E fill:#fff7e6,stroke:#d4a017,color:#1a1a1a
+    style E fill:#e8f7ee,stroke:#2e9e5b,color:#1a1a1a
     style F fill:#f3f0ff,stroke:#7c5cdb,color:#1a1a1a
 ```
 
 ### ✅ Pronto
 
 - Frontend com **build de produção**: multi-stage, servido pelo nginx com fallback de SPA.
+- Interface com **Tailwind CSS + shadcn-vue**, tema claro/escuro/sistema.
+- Backend com **build de produção**: multi-stage, `node dist/main.js` como usuário `node`.
+- Containers com `restart: unless-stopped` (voltam sozinhos se caírem ou se a máquina reiniciar).
 - **Uma única porta de entrada**: o nginx repassa `/api/*` ao backend pela rede interna.
 - Backend e banco **sem portas expostas**.
 - **PostgreSQL 18** com dados persistidos em volume e healthcheck.
@@ -558,8 +570,8 @@ flowchart LR
 ### ⏳ Pendente
 
 - [ ] **Conectar o backend ao Postgres**: escolher um ORM (Prisma, TypeORM ou Drizzle), passar `DATABASE_URL=postgres://USER:SENHA@postgres:5432/DB` ao backend e adicionar `depends_on: postgres: condition: service_healthy`.
-- [ ] **Backend em modo produção**: hoje o [backend/Dockerfile](backend/Dockerfile) roda `pnpm start:dev` (compila na hora e observa arquivos). O certo é multi-stage com `pnpm build` e `node dist/main`, sem `devDependencies`.
-- [ ] **Ajustes no [frontend/Dockerfile](frontend/Dockerfile)**: copiar `package.json` e `package-lock.json` antes do código (para aproveitar o cache do `npm ci`), usar o caminho absoluto `/usr/share/nginx/html` e remover o `mime.types` customizado (a imagem do nginx já traz um).
+- [x] **Backend em modo produção**: o [backend/Dockerfile](backend/Dockerfile) é multi-stage (`npm ci` + `npm run build` + `npm prune --omit=dev`) e roda `node dist/main.js` como usuário `node`, com `NODE_ENV=production`; no compose, `init: true` e `restart: unless-stopped`.
+- [x] **Ajustes no [frontend/Dockerfile](frontend/Dockerfile)**: `package.json` e `package-lock.json` copiados antes do código (cache do `npm ci`), caminho absoluto `/usr/share/nginx/html` e sem `mime.types` customizado (o da imagem do nginx cobre `.woff2`, `.svg`, `.ico`...).
 - [ ] **Ambiente de desenvolvimento em Docker** (opcional): um `Dockerfile.dev` com volume montado para hot reload dentro do container.
 
 ### 🔮 Tópicos avançados (roadmap de estudo)

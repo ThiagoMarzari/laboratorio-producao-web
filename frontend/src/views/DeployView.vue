@@ -2,8 +2,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 const comandos = [
-  { rotulo: 'Desenvolvimento (Vite)', cmd: 'docker build -f Dockerfile.dev -t lab-web:dev .\ndocker run -p 5173:5173 lab-web:dev' },
-  { rotulo: 'Produção (nginx)', cmd: 'docker build -t lab-web:prod .\ndocker run -p 8080:80 lab-web:prod' },
+  { rotulo: 'Produção (Docker Compose)', cmd: 'cp .env.example .env\ndocker compose up -d --build\n# http://localhost' },
+  { rotulo: 'Desenvolvimento (sem Docker)', cmd: '# terminal 1\ncd backend && npm install && npm run start:dev\n\n# terminal 2\ncd frontend && npm install && npm run dev\n# http://localhost:5173' },
 ]
 </script>
 
@@ -12,8 +12,7 @@ const comandos = [
     <div class="space-y-2">
       <h1 class="text-3xl font-semibold tracking-tight">Deploy</h1>
       <p class="text-muted-foreground">
-        Anotações práticas de como subir este frontend. Rode a partir de
-        <code class="rounded bg-muted px-1 py-0.5 font-mono text-sm">frontend/</code>.
+        Anotações práticas de como subir o projeto. Rode a partir da raiz do repositório.
       </p>
     </div>
 

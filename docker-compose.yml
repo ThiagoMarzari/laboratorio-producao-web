@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:18-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -15,11 +16,15 @@ services:
   backend:
     # caminho do Dockerfile
     build: ./backend
+    # PID 1 que repassa sinais: o stop encerra o node na hora em vez de esperar 10s
+    init: true
+    restart: unless-stopped
     # sem ports: só o nginx acessa, pela rede interna
 
   frontend:
     # caminho do Dockerfile
     build: ./frontend
+    restart: unless-stopped
     ports:
       - "80:80"
     depends_on:
