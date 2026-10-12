@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 const links = [
   { to: '/', rotulo: 'Início' },
   { to: '/deploy', rotulo: 'Deploy' },
+  { to: '/docker', rotulo: 'Docker' },
 ]
 </script>
 

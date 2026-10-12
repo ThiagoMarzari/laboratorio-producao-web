@@ -263,11 +263,16 @@ laboratorio-producao-web/
         ├── App.vue           # layout: barra de navegação + seletor de tema
         ├── assets/main.css   # Tailwind + variáveis de tema (claro/escuro)
         ├── lib/utils.ts      # cn(): junta classes do Tailwind
-        ├── router/index.ts   # rotas: / e /deploy
+        ├── router/index.ts   # rotas: /, /deploy e /docker
+        ├── data/
+        │   ├── roadmap.ts    # fases e etapas do roadmap da Home
+        │   └── docker.ts     # conteúdo da página Docker
         ├── views/
-        │   ├── HomeView.vue  # página inicial (tópicos de estudo + status do backend)
-        │   └── DeployView.vue
+        │   ├── HomeView.vue  # página inicial (roadmap + status do backend)
+        │   ├── DeployView.vue
+        │   └── DockerView.vue # Docker × Compose: imagens, containers e comandos
         └── components/
+            ├── CommandBlock.vue   # bloco de comando com botão de copiar
             ├── HealthStatus.vue   # chama /api/health e mostra online/offline
             ├── ModeToggle.vue     # claro / escuro / sistema
             └── ui/                # componentes do shadcn-vue (gerados pelo CLI)
@@ -369,8 +374,9 @@ npm run dev           # http://localhost:5173, hot reload
 
 | Rota | Página | Descrição |
 |---|---|---|
-| `/` | `HomeView` | Tópicos de estudo + card de status do backend |
+| `/` | `HomeView` | Roadmap e progresso do projeto + card de status do backend |
 | `/deploy` | `DeployView` | Anotações de deploy (carregada sob demanda) |
+| `/docker` | `DockerView` | Docker × Docker Compose: imagem vs container, Dockerfile e comandos (carregada sob demanda) |
 
 Como é uma SPA, o nginx usa `try_files $uri /index.html`: qualquer rota que não seja um arquivo real devolve o `index.html`, e o Vue Router decide o que mostrar. É isso que permite dar F5 em `/deploy` sem receber 404.
 
