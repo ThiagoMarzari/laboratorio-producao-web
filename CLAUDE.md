@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Monorepo-style layout (git repo, branch `main`; root `.gitignore` excludes `.env` — `.env.example` is the template) with two top-level dirs:
 
 - `backend/` — NestJS 12 app (strict mode). Default `AppController` (GET `/` → "Hello World!") plus `HealthModule` (GET `/health` → `{ status, uptime, timestamp }`). Not connected to Postgres yet.
-- `frontend/` — Vue 3 + TypeScript + Vite app styled with Tailwind CSS v4 + shadcn-vue. Routes: `/` (`HomeView`, with `HealthStatus` polling `/api/health`) and `/deploy` (`DeployView`).
+- `frontend/` — Vue 3 + TypeScript + Vite app styled with Tailwind CSS v4 + shadcn-vue. Routes: `/` (`HomeView`: project roadmap/progress driven by `src/data/roadmap.ts`, plus `HealthStatus` polling `/api/health`) and `/deploy` (`DeployView`).
 
 ## Frontend commands (run from `frontend/`)
 
