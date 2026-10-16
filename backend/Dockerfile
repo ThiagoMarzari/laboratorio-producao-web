@@ -29,10 +29,14 @@ ENV NODE_ENV=production
 COPY --from=build --chown=node:node /app/package.json ./
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
+# Migrations SQL geradas pelo drizzle-kit; o dist/db/migrate.js (rodado no CMD) lê daqui.
+COPY --from=build --chown=node:node /app/drizzle ./drizzle
 
 # USER: roda como usuário comum em vez de root (mais seguro).
 USER node
 # EXPOSE: só documenta a porta; quem expõe de fato é o docker-compose.yml.
 EXPOSE 3000
-# CMD: executa quando o CONTAINER SOBE. node direto (sem npm) recebe o sinal de stop.
-CMD ["node", "dist/main.js"]
+# CMD: executa quando o CONTAINER SOBE. Aplica as migrations e, só se der certo (&&), sobe a API.
+# Se a migration falhar, o container sai com erro e o restart tenta de novo (a API nunca sobe com schema velho).
+# exec: o node da API substitui o sh e vira o PID principal, então recebe o sinal de stop (shutdown limpo).
+CMD ["sh", "-c", "node dist/db/migrate.js && exec node dist/main.js"]

@@ -12,6 +12,10 @@ services:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       retries: 5
+    # só 127.0.0.1: o backend rodando no host (npm run start:dev) alcança o banco,
+    # mas de fora da máquina (internet, no VPS) a porta continua fechada
+    ports:
+      - "127.0.0.1:5432:5432"
 
   backend:
     # caminho do Dockerfile
@@ -20,6 +24,22 @@ services:
     init: true
     restart: unless-stopped
     # sem ports: só o nginx acessa, pela rede interna
+    environment:
+      # "postgres" é o nome do serviço acima, resolvido pela rede interna do compose
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    # as migrations rodam no próprio start do container (ver CMD do backend/Dockerfile)
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # healthy só quando /health responde 200 (o banco também precisa estar de pé; 503 = unhealthy).
+    # Aparece no `docker compose ps`. wget já vem no Alpine (busybox).
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      # tempo para as migrations rodarem e o Nest subir antes de contar falhas
+      start_period: 30s
 
   frontend:
     # caminho do Dockerfile
@@ -27,6 +47,8 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
+    # sem condition: service_healthy de propósito: com o backend fora, o nginx continua servindo
+    # o site (e a Home mostra o /health falhando) em vez de nem subir
     depends_on:
       - backend
 

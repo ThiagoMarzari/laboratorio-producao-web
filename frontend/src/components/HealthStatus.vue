@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface HealthResponse {
-  status: 'ok'
+  status: 'ok' | 'error'
+  database: 'up' | 'down'
   uptime: number
   timestamp: string
 }
@@ -23,8 +24,11 @@ async function verificar() {
   erro.value = null
   try {
     const resposta = await fetch(`${apiUrl}/health`)
-    if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`)
-    health.value = await resposta.json()
+    // 503 = backend no ar, mas sem o banco: o corpo (HealthResponse) vem dentro de .response
+    const corpo = await resposta.json().catch(() => null)
+    const dados: HealthResponse | undefined = resposta.ok ? corpo : corpo?.response
+    if (!dados) throw new Error(`HTTP ${resposta.status}`)
+    health.value = dados
   } catch (e) {
     health.value = null
     erro.value = e instanceof Error ? e.message : String(e)
@@ -42,9 +46,13 @@ onMounted(verificar)
       <CardTitle class="flex items-center gap-2">
         Backend
         <Badge v-if="carregando" variant="outline">verificando…</Badge>
-        <Badge v-else-if="health" class="bg-emerald-600 text-white dark:bg-emerald-500/20 dark:text-emerald-400">
+        <Badge
+          v-else-if="health?.status === 'ok'"
+          class="bg-emerald-600 text-white dark:bg-emerald-500/20 dark:text-emerald-400"
+        >
           online
         </Badge>
+        <Badge v-else-if="health" variant="destructive">degradado</Badge>
         <Badge v-else-if="erro" variant="destructive">offline</Badge>
       </CardTitle>
       <CardAction>
@@ -59,6 +67,8 @@ onMounted(verificar)
       <dl v-if="health" class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
         <dt class="text-muted-foreground">status</dt>
         <dd>{{ health.status }}</dd>
+        <dt class="text-muted-foreground">banco</dt>
+        <dd>{{ health.database === 'up' ? 'conectado' : 'sem conexão' }}</dd>
         <dt class="text-muted-foreground">uptime</dt>
         <dd>{{ health.uptime }}s</dd>
         <dt class="text-muted-foreground">timestamp</dt>

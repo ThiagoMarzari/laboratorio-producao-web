@@ -7,6 +7,8 @@ const links = [
   { to: '/', rotulo: 'Início' },
   { to: '/deploy', rotulo: 'Deploy' },
   { to: '/docker', rotulo: 'Docker' },
+  { to: '/usuarios', rotulo: 'Usuários' },
+  { to: '/relatorios', rotulo: 'Relatórios' },
 ]
 </script>
 
